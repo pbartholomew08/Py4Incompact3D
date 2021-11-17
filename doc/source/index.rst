@@ -11,7 +11,8 @@ Welcome to Py4Incompact3D's documentation!
    :caption: Contents:
 
 .. include:: ../../README.rst
-
+.. include:: user-guide.rst
+             
 API
 ===
 
