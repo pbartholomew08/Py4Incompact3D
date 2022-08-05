@@ -68,8 +68,9 @@ class Field():
                 elif arg == "io_name":
                     self.io_name = val
 
-        decomp2d.decomp4py.register_variable(self.name, self.io_name)
-                    
+        # decomp2d.decomp4py.register_variable(self.name, self.io_name)
+
+        self.fh = None
         self.data = {}
 
     def _read(self, filename, nx, ny, nz, dtype=np.float64):
@@ -127,7 +128,13 @@ class Field():
         return np.reshape(data_arr, subsizes, "C")
 
     def _read_adios2(self, t, nx, ny, nz):
+        """ Use ADIOS2 interface. """
 
+        return self.fh.read(self.name)
+    
+    def _read_adios2decomp(self, t, nx, ny, nz):
+        """ Use ADIOS2 via 2decomp. """
+        
         filename = os.path.join(self.file_root.split(".")[0], self.name)
         print(f"Trying to read {filename}/{t}")
         return self._read_mpiio(filename, nx, ny, nz)
@@ -218,8 +225,16 @@ class Field():
         if read_adios:
 
             filename = self.file_root.split(".")[0]
+            filext = self.file_root.split(".")[-1]
+            if (filext == "sst") and (not py4incompact3d.HAVE_ADIOS2PY):
+                print("In-situ reader requires Python-enabled ADIOS2!")
+                exit(-1)
+                
             for t in load_times:
-                self.data[t] = self._read_adios2(t, mesh.Nx, mesh.Ny, mesh.Nz)
+                if py4incompact3d.HAVE_ADIOS2PY:
+                    self.data[t] = self._read_adios2(t, mesh.Nx, mesh.Ny, mesh.Nz)
+                else:
+                    self.data[t] = self._read_adios2decomp(t, mesh.Nx, mesh.Ny, mesh.Nz)
             
         elif read_hdf5:
             for t in load_times:

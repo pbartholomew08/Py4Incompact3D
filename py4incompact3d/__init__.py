@@ -30,7 +30,18 @@ except ImportError:
 else:
     HAVE_HDF5 = True
 
+# Check if 2decomp was built with ADIOS2 and if
+# ADIOS2 supports Python.
 HAVE_ADIOS2 = bool(decomp2d.decomp4py.have_adios2)
+if HAVE_ADIOS2:
+    try:
+        import adios2
+    except ImportError:
+        HAVE_ADIOS2PY = False
+    else:
+        HAVE_ADIOS2PY = True
+
+        adios2 = adios2
     
 # Set MPI variables
 comm = MPI.COMM_WORLD
@@ -50,6 +61,7 @@ def report_p4i3d_status():
     print(f"+- running on {size} ranks")
     print(f"- HDF5 enabled: {HAVE_HDF5}")
     print(f"- ADIOS2 enabled: {HAVE_ADIOS2}")
+    print(f"+- Python support: {HAVE_ADIOS2PY}")
     print(line_sep)
 
 if (rank == 0):

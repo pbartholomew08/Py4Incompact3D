@@ -57,13 +57,14 @@ def main():
 
     io_name = "solution-io"
 
-    decomp2d.decomp4py.open_io(io_name, "data")
-    decomp2d.decomp4py.start_io("solution-io", "data")
+    postprocess.open_io(io_name, "data")
+
     for t in range(1, 5+1):
+
         postprocess.load(time=t)
-        print(np.amax(postprocess.fields["ux"].data[t]))
-    decomp2d.decomp4py.end_io("solution-io", "data")
-    decomp2d.decomp4py.close_io(io_name, "data")
+        print(postprocess.fields["uy"].data.keys(), postprocess.fields["uy"].data[t].shape, np.amax(postprocess.fields["uy"].data[t]))
+
+    postprocess.close_io(io_name, "data")
 
 if __name__ == "__main__":
     main()

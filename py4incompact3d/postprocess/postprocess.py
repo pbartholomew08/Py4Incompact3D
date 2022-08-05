@@ -9,6 +9,8 @@
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the
 # specific language governing permissions and limitations under the License.
 
+import py4incompact3d
+
 from warnings import warn
 
 from .input_reader import InputReader
@@ -47,6 +49,8 @@ class Postprocess():
             self.mesh = Mesh(*args, **kwargs)
             self.fields = {}
 
+        self.fh = None
+
     def add_field(self, name, filepath, **kwargs):
 
         description = ""
@@ -62,7 +66,23 @@ class Postprocess():
 
     def init_io(self, io_name):
         decomp2d.decomp4py.init_io(io_name)
-        
+
+    def open_io(self, io_name, io_dir):
+
+        if not py4incompact3d.HAVE_ADIOS2PY:
+            pass
+        else:
+            self.fh = py4incompact3d.adios2.open(io_dir, "r", py4incompact3d.comm,
+                                                 config_file="adios2_config.xml",
+                                                 io_in_config_file=io_name)
+
+    def close_io(self, io_name, io_dir):
+
+        if not py4incompact3d.HAVE_ADIOS2PY:
+            pass
+        else:
+            self.fh.close()
+    
     def _process_input(self):
         return self.input_reader.read(self.input_file)
 
@@ -71,6 +91,9 @@ class Postprocess():
         """
 
         load_vars = self.fields.keys()
+        for field in load_vars:
+            self.fields[field].fh = self.fh
+
         time = -1
         for arg, val in kwargs.items():
             if "vars" == arg:
@@ -78,6 +101,9 @@ class Postprocess():
             elif "time" == arg:
                 time = val
 
+        if py4incompact3d.HAVE_ADIOS2PY:
+            self.fh.__next__() # Force ADIOS2 to advance
+            
         for var in load_vars:
             if self.fields[var].fromfile:
                 self.fields[var].load(self.mesh, time)
