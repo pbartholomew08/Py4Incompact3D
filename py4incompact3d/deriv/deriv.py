@@ -117,7 +117,7 @@ def tdma_periodic(a, b, c, rhs):
     u /= (1.0 + vu)
     for i in range(rhs.shape[0]):
         for j in range(rhs.shape[1]):
-            rhs[i][j] -= np.dot(v, rhs[i][j]) * u
+            rhs[i,j] -= np.dot(v, rhs[i,j]) * u
 
     return rhs
 
@@ -196,16 +196,16 @@ def compute_rhs_0(mesh, field, axis):
         for j in range(field.shape[1]):
             # XXX Due to python's negative indices, BC @ k = 0 automatically applied
             for k in range(field.shape[2] - 2):
-                rhs[i][j][k] = a * (field[i][j][k + 1] - field[i][j][k - 1]) \
-                               + b * (field[i][j][k + 2] - field[i][j][k - 2])
+                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
+                               + b * (field[i,j,k+2] - field[i,j,k-2])
 
             # BCs @ k = n
             k = field.shape[2] - 2
-            rhs[i][j][k] = a * (field[i][j][k + 1] - field[i][j][k - 1]) \
-                           + b * (field[i][j][0] - field[i][j][k - 2])
+            rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
+                           + b * (field[i,j,0] - field[i,j,k-2])
             k = field.shape[2] - 1
-            rhs[i][j][k] = a * (field[i][j][0] - field[i][j][k - 1]) \
-                           + b * (field[i][j][1] - field[i][j][k - 2])
+            rhs[i,j,k] = a * (field[i,j,0] - field[i,j,k-1]) \
+                           + b * (field[i,j,1] - field[i,j,k-2])
 
     return rhs
 
@@ -245,38 +245,38 @@ def compute_rhs_1(mesh, field, axis, field_direction):
             if axis not in field_direction:
                 # npaire = 1
                 k = 0
-                rhs[i][j][k] = 0.0
+                rhs[i,j,k] = 0.0
                 k = 1
-                rhs[i][j][k] = a * (field[i][j][k + 1] - field[i][j][k - 1]) \
-                               + b * (field[i][j][k + 2] - field[i][j][k])
+                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
+                               + b * (field[i,j,k+2] - field[i,j,k])
             else:
                 #npaire = 0
                 k = 0
-                rhs[i][j][k] = 2 * (a * field[i][j][k + 1] + b * field[i][j][k + 2])
+                rhs[i,j,k] = 2 * (a * field[i,j,k+1] + b * field[i,j,k+2])
                 k = 1
-                rhs[i][j][k] = a * (field[i][j][k + 1] - field[i][j][k - 1]) \
-                               + b * (field[i][j][k + 2] + field[i][j][k])
+                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
+                               + b * (field[i,j,k+2] + field[i,j,k])
 
             # Internal nodes
             for k in range(2, field.shape[2] - 2):
-                rhs[i][j][k] = a * (field[i][j][k + 1] - field[i][j][k - 1]) \
-                               + b * (field[i][j][k + 2] - field[i][j][k - 2])
+                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
+                               + b * (field[i,j,k+2] - field[i,j,k-2])
 
             # BCs @ k = n
             if axis not in field_direction:
                 # npaire = 1
                 k = field.shape[2] - 2
-                rhs[i][j][k] = a * (field[i][j][k + 1] - field[i][j][k - 1]) \
-                               + b * (field[i][j][k] - field[i][j][k - 2])
+                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
+                               + b * (field[i,j,k] - field[i,j,k-2])
                 k = field.shape[2] - 1
-                rhs[i][j][k] = 0.0
+                rhs[i,j,k] = 0.0
             else:
                 # npaire = 0
                 k = field.shape[2] - 2
-                rhs[i][j][k] = a * (field[i][j][k + 1] - field[i][j][k - 1]) \
-                               - b * (field[i][j][k] + field[i][j][k - 2])
+                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
+                               - b * (field[i,j,k] + field[i,j,k-2])
                 k = field.shape[2] - 1
-                rhs[i][j][k] = -2 * (a * field[i][j][k - 1] + b * field[i][j][k - 2])
+                rhs[i,j,k] = -2 * (a * field[i,j,k-1] + b * field[i,j,k-2])
 
     return rhs
 
@@ -311,21 +311,21 @@ def compute_rhs_2(mesh, field, axis):
         for j in range(field.shape[1]):
             # BCs @ k = 0
             k = 0
-            rhs[i][j][k] = -(5.0 * field[i][j][k] - 4.0 * field[i][j][k + 1] - field[i][j][k + 2]) \
+            rhs[i,j,k] = -(5.0 * field[i,j,k] - 4.0 * field[i,j,k+1] - field[i,j,k+2]) \
                            * (0.5 * invdx)
             k = 1
-            rhs[i][j][k] = 1.5 * (field[i][j][k + 1] - field[i][j][k - 1]) * (0.5 * invdx)
+            rhs[i,j,k] = 1.5 * (field[i,j,k+1] - field[i,j,k-1]) * (0.5 * invdx)
 
             # Internal nodes
             for k in range(2, field.shape[2] - 2):
-                rhs[i][j][k] = a * (field[i][j][k + 1] - field[i][j][k - 1]) \
-                               + b * (field[i][j][k + 2] - field[i][j][k - 2])
+                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
+                               + b * (field[i,j,k+2] - field[i,j,k-2])
 
             # BCs @ k = n
             k = field.shape[2] - 2
-            rhs[i][j][k] = 1.5 * (field[i][j][k + 1] - field[i][j][k - 1]) * (0.5 * invdx)
+            rhs[i,j,k] = 1.5 * (field[i,j,k+1] - field[i,j,k-1]) * (0.5 * invdx)
             k = field.shape[2] - 1
-            rhs[i][j][k] = (5.0 * field[i][j][k] - 4.0 * field[i][j][k - 1] - field[i][j][k - 2]) \
+            rhs[i,j,k] = (5.0 * field[i,j,k] - 4.0 * field[i,j,k-1] - field[i,j,k-2]) \
                            * (0.5 * invdx)
 
     return rhs
