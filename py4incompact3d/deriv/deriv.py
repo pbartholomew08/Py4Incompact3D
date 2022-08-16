@@ -44,28 +44,30 @@ def tdma(a, b, c, rhs, overwrite=True):
         bloc = np.copy(b)
         rhsloc = np.copy(rhs)
 
-    # I've written this really dumb - quick fix, loop over first index
-    rhsloc = np.swapaxes(rhsloc, 0, 2)
+    # # I've written this really dumb - quick fix, loop over first index
+    # rhsloc = np.swapaxes(rhsloc, 0, 2)
 
     ni = rhsloc.shape[0]
+    nj = rhsloc.shape[1]
+    nk = rhsloc.shape[2]
 
     # First manipulate the diagonal
-    for i in range(1, ni):
-        bloc[i] -= a[i] * c[i - 1] / bloc[i - 1]
+    bloc[1:] -= a[1:] * c[0:nk-1] / bloc[0:nk-1]
 
-    # Forward elimination
-    for i in range(1, ni):
-        m = a[i] / bloc[i - 1]
-        rhsloc[i] -= m * rhsloc[i - 1]
+    for i in range(ni):
+        for j in range(nj):
+            # Forward elimination
+            rhsloc[i,j,1:] -= (a[1:] / bloc[0:nk-1]) * rhsloc[i,j,0:nk-1]
 
-    # Backward substitution
-    rhsloc[-1] /= bloc[-1]
-    for i in range(ni - 2, -1, -1):
-        rhsloc[i] -= c[i] * rhsloc[i + 1]
-        rhsloc[i] /= bloc[i]
+            # Backward substitution
+            rhsloc[i,j,-1] /= bloc[-1]
+            rhsloc[i,j,nk-2:0:-1] -= c[nk-2:0:-1] * rhsloc[i,j,nk-1:1:-1] / bloc[nk-2:0:-1]
+            k = 0
+            rhsloc[i,j,k] -= c[k] * rhsloc[i,j,k + 1]
+            rhsloc[i,j,k] /= bloc[k]
 
-    # I've written this really dumb - input expects result in last index
-    rhsloc = np.swapaxes(rhsloc, 0, 2)
+    # # I've written this really dumb - input expects result in last index
+    # rhsloc = np.swapaxes(rhsloc, 0, 2)
 
     return rhsloc
 
@@ -239,44 +241,42 @@ def compute_rhs_1(mesh, field, axis, field_direction):
     a = mesh.a * invdx / 2.0
     b = mesh.b * invdx / 4.0
 
-    for i in range(field.shape[0]):
-        for j in range(field.shape[1]):
-            #BCs @ k = 0
-            if axis not in field_direction:
-                # npaire = 1
-                k = 0
-                rhs[i,j,k] = 0.0
-                k = 1
-                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
-                               + b * (field[i,j,k+2] - field[i,j,k])
-            else:
-                #npaire = 0
-                k = 0
-                rhs[i,j,k] = 2 * (a * field[i,j,k+1] + b * field[i,j,k+2])
-                k = 1
-                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
-                               + b * (field[i,j,k+2] + field[i,j,k])
+    #BCs @ k = 0
+    if axis not in field_direction:
+        # npaire = 1
+        k = 0
+        rhs[:,:,k] = 0.0
+        k = 1
+        rhs[:,:,k] = a * (field[:,:,k+1] - field[:,:,k-1]) \
+            + b * (field[:,:,k+2] - field[:,:,k])
+    else:
+        #npaire = 0
+        k = 0
+        rhs[:,:,k] = 2 * (a * field[:,:,k+1] + b * field[:,:,k+2])
+        k = 1
+        rhs[:,:,k] = a * (field[:,:,k+1] - field[:,:,k-1]) \
+            + b * (field[:,:,k+2] + field[:,:,k])
 
-            # Internal nodes
-            for k in range(2, field.shape[2] - 2):
-                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
-                               + b * (field[i,j,k+2] - field[i,j,k-2])
+    # Internal nodes
+    n = field.shape[2]
+    rhs[:,:,2:n-3] = a * (field[:,:,3:n-2] - field[:,:,1:n-4]) \
+        + b * (field[:,:,4:n-1] - field[:,:,0:n-5])
 
-            # BCs @ k = n
-            if axis not in field_direction:
-                # npaire = 1
-                k = field.shape[2] - 2
-                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
-                               + b * (field[i,j,k] - field[i,j,k-2])
-                k = field.shape[2] - 1
-                rhs[i,j,k] = 0.0
-            else:
-                # npaire = 0
-                k = field.shape[2] - 2
-                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
-                               - b * (field[i,j,k] + field[i,j,k-2])
-                k = field.shape[2] - 1
-                rhs[i,j,k] = -2 * (a * field[i,j,k-1] + b * field[i,j,k-2])
+    # BCs @ k = n
+    if axis not in field_direction:
+        # npaire = 1
+        k = field.shape[2] - 2
+        rhs[:,:,k] = a * (field[:,:,k+1] - field[:,:,k-1]) \
+                               + b * (field[:,:,k] - field[:,:,k-2])
+        k = field.shape[2] - 1
+        rhs[:,:,k] = 0.0
+    else:
+        # npaire = 0
+        k = field.shape[2] - 2
+        rhs[:,:,k] = a * (field[:,:,k+1] - field[:,:,k-1]) \
+            - b * (field[:,:,k] + field[:,:,k-2])
+        k = field.shape[2] - 1
+        rhs[:,:,k] = -2 * (a * field[:,:,k-1] + b * field[:,:,k-2])
 
     return rhs
 
