@@ -34,9 +34,6 @@ ADIOS2_FILE="/home/paul/src/Xcompact3d/Incompact3d/examples/Taylor-Green-Vortex/
 
 def calc_enst(dudy, dudz, dvdx, dvdz, dwdx, dwdy):
 
-    print(f"U: {dudy.shape}; {dudz.shape}")
-    print(f"V: {dvdx.shape}; {dvdz.shape}")
-    print(f"W: {dwdx.shape}; {dwdy.shape}")
     enst = (dwdy - dvdz)**2 + (dudz - dwdx)**2 + (dvdx - dudy)**2
     return enst / 2.0
 
