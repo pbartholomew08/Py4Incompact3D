@@ -130,7 +130,17 @@ class Field():
     def _read_adios2(self, t, nx, ny, nz):
         """ Use ADIOS2 interface. """
 
-        return self.fh.read(self.name)
+        global_size, local_size, start = decomp2d.decomp4py.get_io_extents(1)
+
+        # Note, data comes in in Fortran order - need to read as though transposed
+        startf = np.flip(start)
+        local_sizef = np.flip(local_size)
+        data = self.fh.read(self.name, start=startf, count=local_sizef)
+
+        # Reshape our local data to conform to C-ordering
+        return np.reshape(np.ravel(data, order="F"),
+                          local_size,
+                          order="C")
     
     def _read_adios2decomp(self, t, nx, ny, nz):
         """ Use ADIOS2 via 2decomp. """
