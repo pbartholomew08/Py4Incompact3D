@@ -33,6 +33,7 @@ else:
 # Check if 2decomp was built with ADIOS2 and if
 # ADIOS2 supports Python.
 HAVE_ADIOS2 = bool(decomp2d.decomp4py.have_adios2)
+HAVE_ADIOS2PY = False
 if HAVE_ADIOS2:
     try:
         import adios2
@@ -40,7 +41,6 @@ if HAVE_ADIOS2:
         HAVE_ADIOS2PY = False
     else:
         HAVE_ADIOS2PY = True
-
         adios2 = adios2
     
 # Set MPI variables
