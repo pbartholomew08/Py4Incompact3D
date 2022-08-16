@@ -52,19 +52,25 @@ def tdma(a, b, c, rhs, overwrite=True):
     nk = rhsloc.shape[2]
 
     # First manipulate the diagonal
-    bloc[1:] -= a[1:] * c[0:nk-1] / bloc[0:nk-1]
+    start = 1
+    end = nk
+    bloc[start:end] -= (a[start:end] / bloc[start-1:end-1]) * c[start-1:end-1]
 
     for i in range(ni):
         for j in range(nj):
             # Forward elimination
-            rhsloc[i,j,1:] -= (a[1:] / bloc[0:nk-1]) * rhsloc[i,j,0:nk-1]
+            start = 1
+            end = nk
+            rhsloc[i,j,start:end] -= (a[start:end] / bloc[start-1:end-1]) * rhsloc[i,j,start-1:end-1]
 
             # Backward substitution
             rhsloc[i,j,-1] /= bloc[-1]
-            rhsloc[i,j,nk-2:0:-1] -= c[nk-2:0:-1] * rhsloc[i,j,nk-1:1:-1] / bloc[nk-2:0:-1]
-            k = 0
-            rhsloc[i,j,k] -= c[k] * rhsloc[i,j,k + 1]
-            rhsloc[i,j,k] /= bloc[k]
+            start = nk - 2
+            end = 0
+            step = -1
+            rhsloc[i,j,start:end:step] = (rhsloc[i,j,start:end:step] - c[start:end:step] * rhsloc[i,j,start+1:end+1:step]) / bloc[start:end:step]
+            rhsloc[i,j,0] -= c[0] * rhsloc[i,j,0 + 1]
+            rhsloc[i,j,0] /= bloc[0]
 
     # # I've written this really dumb - input expects result in last index
     # rhsloc = np.swapaxes(rhsloc, 0, 2)
@@ -259,8 +265,10 @@ def compute_rhs_1(mesh, field, axis, field_direction):
 
     # Internal nodes
     n = field.shape[2]
-    rhs[:,:,2:n-3] = a * (field[:,:,3:n-2] - field[:,:,1:n-4]) \
-        + b * (field[:,:,4:n-1] - field[:,:,0:n-5])
+    start = 2
+    end = n - 2
+    rhs[:,:,start:end] = a * (field[:,:,start + 1:end + 1] - field[:,:,start - 1:end - 1]) \
+        + b * (field[:,:,start + 2:end + 2] - field[:,:,start - 2:end - 2])
 
     # BCs @ k = n
     if axis not in field_direction:
@@ -317,9 +325,9 @@ def compute_rhs_2(mesh, field, axis):
             rhs[i,j,k] = 1.5 * (field[i,j,k+1] - field[i,j,k-1]) * (0.5 * invdx)
 
             # Internal nodes
-            for k in range(2, field.shape[2] - 2):
-                rhs[i,j,k] = a * (field[i,j,k+1] - field[i,j,k-1]) \
-                               + b * (field[i,j,k+2] - field[i,j,k-2])
+            n = field.shape[2]
+            rhs[i,j,2:n-2] = a * (field[i,j,3:n-1] - field[i,j,1:n-3]) \
+                + b * (field[i,j,4:n] - field[i,j,0:n-4])
 
             # BCs @ k = n
             k = field.shape[2] - 2
