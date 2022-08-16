@@ -12,6 +12,7 @@ import numpy as np
 
 from py4incompact3d import comm, rank
 from py4incompact3d.postprocess.postprocess import Postprocess
+from py4incompact3d.deriv.deriv import deriv
 import decomp2d
 
 HDR="=" * 72
@@ -31,16 +32,16 @@ BCZ=BCX
 
 ADIOS2_FILE="/home/paul/src/Xcompact3d/Incompact3d/examples/Taylor-Green-Vortex/data"
 
-def ke(u, v, w):
-    """Given a velocity field, computue the kinetic energy."""
-    return 0.5 * (u**2 + v**2 + w**2)
+def calc_enst(dudy, dudz, dvdx, dvdz, dwdx, dwdy):
 
-def integrate_func(f, postprocess, time):
-    """Given some function f, apply to a field and integrate."""
-    pass    
+    print(f"U: {dudy.shape}; {dudz.shape}")
+    print(f"V: {dvdx.shape}; {dvdz.shape}")
+    print(f"W: {dwdx.shape}; {dwdy.shape}")
+    enst = (dwdy - dvdz)**2 + (dudz - dwdx)**2 + (dvdx - dudy)**2
+    return enst / 2.0
 
-def calc_ke(ux, uy, uz):
-    ke = (ux**2 + uy**2 + uz**2)
+def calc_ke(u, v, w):
+    ke = u**2 + v**2 + w**2
     return ke / 2.0
 
 def integrate_field(phi):
@@ -70,7 +71,8 @@ def main():
     postprocess.open_io(io_name, "data")
 
     ke_hist = []
-
+    enst_hist = []
+    
     mesh = postprocess.mesh
     xlast = mesh.NxLocal[0]
     ylast = mesh.NyLocal[0]
@@ -82,8 +84,7 @@ def main():
     if (mesh.NzStart[0] + mesh.NzLocal[0]) == NZ:
         zlast -=1
 
-    print(f"{rank}: {mesh.NxStart[0]},{mesh.NyStart[0]},{mesh.NzStart[0]}")
-    for t in range(1, 4000+1):
+    for t in range(1, 100+1):
 
         postprocess.load(time=t)
 
@@ -96,8 +97,20 @@ def main():
                                      uy[:xlast,:ylast,:zlast],
                                      uz[:xlast,:ylast,:zlast]))
         ke = ke / (NX - 1) / (NY - 1) / (NZ - 1) # Average
-
         ke_hist.append(ke)
+
+        # Update enstrophy
+        dudy = deriv(postprocess, "ux", 1, t)
+        dudz = deriv(postprocess, "ux", 2, t)
+        dvdx = deriv(postprocess, "uy", 0, t)
+        dvdz = deriv(postprocess, "uy", 2, t)
+        dwdx = deriv(postprocess, "uz", 0, t)
+        dwdy = deriv(postprocess, "uz", 1, t)
+        enst = integrate_field(calc_enst(dudy[:xlast,:ylast,:zlast], dudz[:xlast,:ylast,:zlast],
+                                         dvdx[:xlast,:ylast,:zlast], dvdz[:xlast,:ylast,:zlast],
+                                         dwdx[:xlast,:ylast,:zlast], dwdy[:xlast,:ylast,:zlast]))
+        enst = enst / (NX - 1) / (NY - 1) / (NZ - 1)
+        enst_hist.append(enst)
 
         # Cleanup data
         postprocess.clear_data()
@@ -107,9 +120,9 @@ def main():
     if rank == 0:
         with open("ke.dat", "w") as output:
             t = 1
-            for ke in ke_hist:
+            for i in range(len(ke_hist)):
                 if (t%10 == 0):
-                    output.write(f"{ke}\n")
+                    output.write(f"{ke_hist[i]},{enst_hist[i]}\n")
                 t += 1
 
 if __name__ == "__main__":

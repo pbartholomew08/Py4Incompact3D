@@ -7,6 +7,9 @@
 
 import numpy as np
 
+from py4incompact3d.postprocess.fields import Field
+from py4incompact3d.parallel.transpose import transpose
+
 def tdma(a, b, c, rhs, overwrite=True):
     """ The Tri-Diagonal Matrix Algorithm.
 
@@ -327,19 +330,19 @@ def compute_rhs_2(mesh, field, axis):
 
     return rhs
 
-def compute_rhs(postproc, field, axis, time, bc):
+def compute_rhs(postproc, arr, axis, direction, bc):
     """ Compute the rhs for the derivative.
 
     :param postproc: The basic postprocessing object.
-    :param field: The name of the variable who's derivative we want.
+    :param arr: An array containing the field's values.
     :param axis: A number indicating direction in which to take derivative: 0=x; 1=y; 2=z.
-    :param time: The time to compute rhs for.
+    :param direction: The field's orientation
     :param bc: The boundary condition: 0=periodic; 1=free-slip; 2=Dirichlet.
 
     :type mesh: py4incompact3d.postprocess.postproc.Postproc
-    :type field: str
+    :type arr: numpy.ndarray
     :type axis: int
-    :type time: int
+    :type direction: int
     :type bc: int
 
     :returns: rhs -- the right-hand side vector.
@@ -347,11 +350,9 @@ def compute_rhs(postproc, field, axis, time, bc):
     """
 
     mesh = postproc.mesh
-    arr = postproc.fields[field].data[time]
     if bc == 0:
         return compute_rhs_0(mesh, arr, axis)
     elif bc == 1:
-        direction = postproc.fields[field].direction
         return compute_rhs_1(mesh, arr, axis, direction)
     else:
         return compute_rhs_2(mesh, arr, axis)
@@ -376,8 +377,23 @@ def deriv(postproc, phi, axis, time):
     # Ensure we have the derivative variables up to date
     postproc.mesh.compute_derivvars()
 
+    # Transpose input pencil, data comes in in X-pencils
+    if axis > 0:
+        arrY = Field()
+        arrY.new(postproc.mesh, pencil=1)
+        arrY.data[0] = transpose(postproc.fields[phi].data[time], "xy", arrY.data[0])
+        if axis == 2:
+            arrZ = Field()
+            arrZ.new(postproc.mesh, pencil=2)
+
+            arr = transpose(arrY.data[0], "yz", arrZ.data[0])
+        else:
+            arr = arrY.data[0]
+    else:
+        arr = postproc.fields[phi].data[time]
+    
     # Transpose the data to make loops more efficient
-    postproc.fields[phi].data[time] = np.swapaxes(postproc.fields[phi].data[time], axis, 2)
+    arr = np.swapaxes(arr, axis, 2)
 
     # Get boundary conditions
     if axis == 0:
@@ -388,12 +404,25 @@ def deriv(postproc, phi, axis, time):
         bc = postproc.mesh.BCz
 
     # Compute RHS->derivative
-    rhs = compute_rhs(postproc, phi, axis, time, bc)
-    rhs = compute_deriv(rhs, bc, not bool(axis in postproc.fields[phi].direction))
+    rhs = compute_rhs(postproc, arr, axis, [postproc.fields[phi].direction], bc)
+    rhs = compute_deriv(rhs, bc, not bool(axis in [postproc.fields[phi].direction]))
 
     if (axis == 1) and postproc.mesh.stretched:
         rhs[:][:] *= postproc.mesh.ppy # XXX derivative is stored in last axis
 
-    # Transpose back to normal orientation and return
-    postproc.fields[phi].data[time] = np.swapaxes(postproc.fields[phi].data[time], 2, axis)
-    return np.swapaxes(rhs, 2, axis)
+    # Transpose output data
+    rhs = np.swapaxes(rhs, 2, axis)
+
+    # Transpose output pencil
+    if axis > 0:
+        if axis == 2:
+            arrZ.data[0] = rhs
+            arrY.data[0] = transpose(arrZ.data[0], "zy", arrY.data[0])
+        else:
+            arrY.data[0] = rhs
+
+        arrX = Field()
+        arrX.new(postproc.mesh, pencil=0)
+        rhs = transpose(arrY.data[0], "yx", arrX.data[0])
+        
+    return rhs
