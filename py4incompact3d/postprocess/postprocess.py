@@ -57,6 +57,10 @@ class Postprocess():
         direction = -1   # Assume field is a scalar
         dtype = "double" # Xcompact3d uses double by default
         io_name = "solution-io"
+
+        for key, val in kwargs.items():
+            if key == "direction":
+                direction = val
         
         self.fields[name] = Field(name=name, file_root=filepath,
                                   description=description,
