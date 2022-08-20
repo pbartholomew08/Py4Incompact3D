@@ -37,6 +37,22 @@ def tdma(a, b, c, rhs, overwrite=True):
     :rtype: numpy.ndarray
     """
 
+    def ihrec1(x, f, g,
+               start=0, end=None, step=1):
+        """ Solve an inhomogeneous first-order recurrence relation of the form
+
+            x_n+1 = f_n x_n + g_n
+        """
+
+        if end == None:
+            end = len(x)
+
+        fprod = np.cumprod(f[start:end - step:step])
+        gsum = np.cumsum(g[start:end - step:step] / fprod[start:end - step:step])
+
+        A0 = x[start]
+        x[start + step:end:step] = fprod[start:end - step:step] * (A0 + gsum[start:end - step:step])
+        
     if overwrite:
         bloc = b
         rhsloc = rhs
@@ -54,23 +70,32 @@ def tdma(a, b, c, rhs, overwrite=True):
     # First manipulate the diagonal
     start = 1
     end = nk
-    bloc[start:end] -= (a[start:end] / bloc[start-1:end-1]) * c[start-1:end-1]
+    # bloc[start:end] -= (a[start:end] / bloc[start-1:end-1]) * c[start-1:end-1]
+    for i in range(start, end):
+        bloc[i] -= (a[i] / bloc[i-1]) * c[i-1]
 
     for i in range(ni):
         for j in range(nj):
             # Forward elimination
             start = 1
-            end = nk
-            rhsloc[i,j,start:end] -= (a[start:end] / bloc[start-1:end-1]) * rhsloc[i,j,start-1:end-1]
+            end = nk - 1
+            rhsloc[i,j,start] -= (a[start] / bloc[start-1]) * rhsloc[i,j,start-1]
+            ihrec1(rhsloc[i,j,start:end], -a[start+1:end] / bloc[start:end-1],
+                   rhsloc[i,j,start+1:end])
+            rhsloc[i,j,end] -= (a[end] / bloc[end-1]) * rhsloc[i,j,end-1]
 
             # Backward substitution
             rhsloc[i,j,-1] /= bloc[-1]
-            start = nk - 2
-            end = 0
-            step = -1
-            rhsloc[i,j,start:end:step] = (rhsloc[i,j,start:end:step] - c[start:end:step] * rhsloc[i,j,start+1:end+1:step]) / bloc[start:end:step]
+            start = 0
+            end = nk - 1
+            rrev = np.flip(rhsloc[i,j,:])
+            crev = np.flip(c)
+            brev = np.flip(b)
+            ihrec1(rrev[start:end], -crev[start+1:end] / brev[start+1:end],
+                   rrev[start+1:end] / brev[start+1:end])
             rhsloc[i,j,0] -= c[0] * rhsloc[i,j,0 + 1]
             rhsloc[i,j,0] /= bloc[0]
+            
 
     # # I've written this really dumb - input expects result in last index
     # rhsloc = np.swapaxes(rhsloc, 0, 2)
@@ -145,7 +170,7 @@ def compute_deriv(rhs, bc, npaire):
 
     a = (1.0 / 3.0) * np.ones(rhs.shape[2])
     b = np.ones(rhs.shape[2])
-    c = a
+    c = np.copy(a)
 
     if bc == 0:
         # Periodic
@@ -275,7 +300,7 @@ def compute_rhs_1(mesh, field, axis, field_direction):
         # npaire = 1
         k = field.shape[2] - 2
         rhs[:,:,k] = a * (field[:,:,k+1] - field[:,:,k-1]) \
-                               + b * (field[:,:,k] - field[:,:,k-2])
+            + b * (field[:,:,k] - field[:,:,k-2])
         k = field.shape[2] - 1
         rhs[:,:,k] = 0.0
     else:
