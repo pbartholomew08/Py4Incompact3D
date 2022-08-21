@@ -48,10 +48,14 @@ def tdma(a, b, c, rhs, overwrite=True):
             end = len(x)
 
         fprod = np.cumprod(f[start:end - step:step])
-        gsum = np.cumsum(g[start:end - step:step] / fprod[start:end - step:step])
+        gsum = np.cumsum(g[:,:,start:end - step:step] / fprod[start:end - step:step],
+                         axis=2)
 
-        A0 = x[start]
-        x[start + step:end:step] = fprod[start:end - step:step] * (A0 + gsum[start:end - step:step])
+        A0 = x[:,:,start:start+1]
+
+        print(x.shape, fprod.shape, A0.shape, gsum.shape)
+        
+        x[:,:,start + step:end:step] = fprod[start:end - step:step] * (A0 + gsum[:,:,start:end - step:step])
         
     if overwrite:
         bloc = b
@@ -74,28 +78,28 @@ def tdma(a, b, c, rhs, overwrite=True):
     for i in range(start, end):
         bloc[i] -= (a[i] / bloc[i-1]) * c[i-1]
 
-    for i in range(ni):
-        for j in range(nj):
-            # Forward elimination
-            start = 1
-            end = nk - 1
-            rhsloc[i,j,start] -= (a[start] / bloc[start-1]) * rhsloc[i,j,start-1]
-            ihrec1(rhsloc[i,j,start:end], -a[start+1:end] / bloc[start:end-1],
-                   rhsloc[i,j,start+1:end])
-            rhsloc[i,j,end] -= (a[end] / bloc[end-1]) * rhsloc[i,j,end-1]
+    # Both forwards and backwards elimination/sweeps are written in terms of inhomogeneous
+    # first-order recurrences, this allows an efficient implementation using numpy broadcasting.
 
-            # Backward substitution
-            rhsloc[i,j,-1] /= bloc[-1]
-            start = 0
-            end = nk - 1
-            rrev = np.flip(rhsloc[i,j,:])
-            crev = np.flip(c)
-            brev = np.flip(b)
-            ihrec1(rrev[start:end], -crev[start+1:end] / brev[start+1:end],
-                   rrev[start+1:end] / brev[start+1:end])
-            rhsloc[i,j,0] -= c[0] * rhsloc[i,j,0 + 1]
-            rhsloc[i,j,0] /= bloc[0]
-            
+    # Forward elimination
+    start = 1
+    end = nk - 1
+    rhsloc[:,:,start] -= (a[start] / bloc[start-1]) * rhsloc[:,:,start-1]
+    ihrec1(rhsloc[:,:,start:end], -a[start+1:end] / bloc[start:end-1],
+           rhsloc[:,:,start+1:end])
+    rhsloc[:,:,end] -= (a[end] / bloc[end-1]) * rhsloc[:,:,end-1]
+
+    # Backward substitution
+    rhsloc[:,:,-1] /= bloc[-1]
+    start = 0
+    end = nk - 1
+    rrev = np.flip(rhsloc)
+    crev = np.flip(c)
+    brev = np.flip(b)
+    ihrec1(rrev[:,:,start:end], -crev[start+1:end] / brev[start+1:end],
+           rrev[:,:,start+1:end] / brev[start+1:end])
+    rhsloc[:,:,0] -= c[0] * rhsloc[:,:,0 + 1]
+    rhsloc[:,:,0] /= bloc[0]
 
     # # I've written this really dumb - input expects result in last index
     # rhsloc = np.swapaxes(rhsloc, 0, 2)
