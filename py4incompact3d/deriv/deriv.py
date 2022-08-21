@@ -52,9 +52,6 @@ def tdma(a, b, c, rhs, overwrite=True):
                          axis=2)
 
         A0 = x[:,:,start:start+1]
-
-        print(x.shape, fprod.shape, A0.shape, gsum.shape)
-        
         x[:,:,start + step:end:step] = fprod[start:end - step:step] * (A0 + gsum[:,:,start:end - step:step])
         
     if overwrite:
@@ -63,9 +60,6 @@ def tdma(a, b, c, rhs, overwrite=True):
     else: # Creat local copies
         bloc = np.copy(b)
         rhsloc = np.copy(rhs)
-
-    # # I've written this really dumb - quick fix, loop over first index
-    # rhsloc = np.swapaxes(rhsloc, 0, 2)
 
     ni = rhsloc.shape[0]
     nj = rhsloc.shape[1]
@@ -90,6 +84,7 @@ def tdma(a, b, c, rhs, overwrite=True):
     rhsloc[:,:,end] -= (a[end] / bloc[end-1]) * rhsloc[:,:,end-1]
 
     # Backward substitution
+    # XXX: uses reversed (aka "flipped") views to make the indexing easier /without/ copies.
     rhsloc[:,:,-1] /= bloc[-1]
     start = 0
     end = nk - 1
@@ -100,9 +95,6 @@ def tdma(a, b, c, rhs, overwrite=True):
            rrev[:,:,start+1:end] / brev[start+1:end])
     rhsloc[:,:,0] -= c[0] * rhsloc[:,:,0 + 1]
     rhsloc[:,:,0] /= bloc[0]
-
-    # # I've written this really dumb - input expects result in last index
-    # rhsloc = np.swapaxes(rhsloc, 0, 2)
 
     return rhsloc
 
