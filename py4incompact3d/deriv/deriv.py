@@ -45,7 +45,7 @@ def tdma(a, b, c, rhs, overwrite=True):
         """
 
         if end == None:
-            end = len(x)
+            end = x.shape[-1]
 
         fprod = np.cumprod(f[start:end - step:step])
         gsum = np.cumsum(g[:,:,start:end - step:step] / fprod[start:end - step:step],
@@ -61,8 +61,6 @@ def tdma(a, b, c, rhs, overwrite=True):
         bloc = np.copy(b)
         rhsloc = np.copy(rhs)
 
-    ni = rhsloc.shape[0]
-    nj = rhsloc.shape[1]
     nk = rhsloc.shape[2]
 
     # First manipulate the diagonal
@@ -88,7 +86,7 @@ def tdma(a, b, c, rhs, overwrite=True):
     rhsloc[:,:,-1] /= bloc[-1]
     start = 0
     end = nk - 1
-    rrev = np.flip(rhsloc)
+    rrev = np.flip(rhsloc, axis=-1)
     crev = np.flip(c)
     brev = np.flip(b)
     ihrec1(rrev[:,:,start:end], -crev[start+1:end] / brev[start+1:end],
