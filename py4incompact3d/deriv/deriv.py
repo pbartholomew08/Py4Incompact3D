@@ -48,11 +48,34 @@ def tdma(a, b, c, rhs, overwrite=True):
             end = x.shape[-1]
 
         fprod = np.cumprod(f[start:end - step:step])
-        gsum = np.cumsum(g[:,:,start:end - step:step] / fprod[start:end - step:step],
-                         axis=2)
+        
+        # gsum = np.cumsum(g[:,:,start:end - step:step] / fprod[start:end - step:step],
+        #                  axis=2)
+        # gsum[:,:,start:end - step:step] = fprod[start:end - step:step] * gsum[:,:,start:end - step:step]
+        
+        # # print(gsum[0,0,:])
+        # print("fprod")
+        # print(fprod * np.cumsum(1 / fprod))
+        # print(gsum[0,0])
+        
+        nf = fprod.shape[0]
+        Fiprod = np.reshape(np.repeat(f, nf),
+                            (nf, nf))
+        Fiprod[np.triu_indices(nf)] = 1
+        Fiprod = np.cumprod(Fiprod, axis=0)
+        Fiprod[np.triu_indices(nf, 1)] = 0
+
+        gsum = np.dot(g[:,:,start:end - step:step], Fiprod[:,start:end-step:step].transpose())
+
+        # # # print(gsum[0,0,:])
+        # # print("Fiprod")
+        # # print(np.dot(Fiprod, np.ones(nf)))
+        # print(gsum[0,0])
+        
+        # exit(1)
 
         A0 = x[:,:,start:start+1]
-        x[:,:,start + step:end:step] = fprod[start:end - step:step] * (A0 + gsum[:,:,start:end - step:step])
+        x[:,:,start + step:end:step] = fprod[start:end - step:step] * A0 + gsum[:,:,start:end - step:step]
         
     if overwrite:
         bloc = b
