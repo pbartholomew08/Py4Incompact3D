@@ -10,7 +10,7 @@ import numpy as np
 from py4incompact3d.postprocess.fields import Field
 from py4incompact3d.parallel.transpose import transpose
 
-gsum={}
+Fiprod={}
 
 def tdma(a, b, c, rhs, pencil, npaire, overwrite=True):
     """ The Tri-Diagonal Matrix Algorithm.
@@ -61,20 +61,21 @@ def tdma(a, b, c, rhs, pencil, npaire, overwrite=True):
         # print(fprod * np.cumsum(1 / fprod))
         # print(gsum[0,0])
         
-        nf = fprod.shape[0]
-        Fiprod = np.reshape(np.repeat(f, nf),
-                            (nf, nf))
-        Fiprod[np.triu_indices(nf)] = 1
-        Fiprod = np.cumprod(Fiprod, axis=0)
-        Fiprod[np.triu_indices(nf, 1)] = 0
 
-        if not pencil in gsum.keys():
-            gsum[pencil] = {}
-        if not npaire in gsum[pencil].keys():
-            gsum[pencil][npaire] = {}
-        if not arr in gsum[pencil][npaire].keys():
-            gsum[pencil][npaire][arr] = np.dot(g[:,:,start:end - step:step],
-                                               Fiprod[:,start:end-step:step].transpose())
+        if not pencil in Fiprod.keys():
+            Fiprod[pencil] = {}
+        if not npaire in Fiprod[pencil].keys():
+            Fiprod[pencil][npaire] = {}
+        if not arr in Fiprod[pencil][npaire].keys():
+            nf = fprod.shape[0]
+            Fiprod[pencil][npaire][arr] = np.reshape(np.repeat(f, nf),
+                                                     (nf, nf))
+            Fiprod[pencil][npaire][arr][np.triu_indices(nf)] = 1
+            Fiprod[pencil][npaire][arr] = np.cumprod(Fiprod[pencil][npaire][arr], axis=0)
+            Fiprod[pencil][npaire][arr][np.triu_indices(nf, 1)] = 0
+            
+        gsum = np.dot(g[:,:,start:end - step:step],
+                      Fiprod[pencil][npaire][arr][:,start:end-step:step].transpose())
 
         # # # print(gsum[0,0,:])
         # # print("Fiprod")
@@ -85,7 +86,7 @@ def tdma(a, b, c, rhs, pencil, npaire, overwrite=True):
 
         A0 = x[:,:,start:start+1]
         x[:,:,start + step:end:step] = fprod[start:end - step:step] * A0 \
-            + gsum[pencil][npaire][arr][:,:,start:end - step:step]
+            + gsum[:,:,start:end - step:step]
         
     if overwrite:
         bloc = b
