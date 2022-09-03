@@ -52,16 +52,6 @@ def tdma(a, b, c, rhs, pencil, npaire, overwrite=True):
 
         fprod = np.cumprod(f[start:end - step:step])
         
-        # gsum = np.cumsum(g[:,:,start:end - step:step] / fprod[start:end - step:step],
-        #                  axis=2)
-        # gsum[:,:,start:end - step:step] = fprod[start:end - step:step] * gsum[:,:,start:end - step:step]
-        
-        # # print(gsum[0,0,:])
-        # print("fprod")
-        # print(fprod * np.cumsum(1 / fprod))
-        # print(gsum[0,0])
-        
-
         if not pencil in Fiprod.keys():
             Fiprod[pencil] = {}
         if not npaire in Fiprod[pencil].keys():
@@ -77,12 +67,7 @@ def tdma(a, b, c, rhs, pencil, npaire, overwrite=True):
         gsum = np.dot(g[:,:,start:end - step:step],
                       Fiprod[pencil][npaire][arr][:,start:end-step:step].transpose())
 
-        # # # print(gsum[0,0,:])
-        # # print("Fiprod")
-        # # print(np.dot(Fiprod, np.ones(nf)))
-        # print(gsum[0,0])
         
-        # exit(1)
 
         A0 = x[:,:,start:start+1]
         x[:,:,start + step:end:step] = fprod[start:end - step:step] * A0 \
