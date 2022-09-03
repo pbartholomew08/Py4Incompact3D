@@ -10,7 +10,9 @@ import numpy as np
 from py4incompact3d.postprocess.fields import Field
 from py4incompact3d.parallel.transpose import transpose
 
-def tdma(a, b, c, rhs, overwrite=True):
+gsum={}
+
+def tdma(a, b, c, rhs, pencil, npaire, overwrite=True):
     """ The Tri-Diagonal Matrix Algorithm.
 
     Solves tri-diagonal matrices using TDMA where the matrices are of the form
@@ -38,6 +40,7 @@ def tdma(a, b, c, rhs, overwrite=True):
     """
 
     def ihrec1(x, f, g,
+               arr,
                start=0, end=None, step=1):
         """ Solve an inhomogeneous first-order recurrence relation of the form
 
@@ -65,7 +68,13 @@ def tdma(a, b, c, rhs, overwrite=True):
         Fiprod = np.cumprod(Fiprod, axis=0)
         Fiprod[np.triu_indices(nf, 1)] = 0
 
-        gsum = np.dot(g[:,:,start:end - step:step], Fiprod[:,start:end-step:step].transpose())
+        if not pencil in gsum.keys():
+            gsum[pencil] = {}
+        if not npaire in gsum[pencil].keys():
+            gsum[pencil][npaire] = {}
+        if not arr in gsum[pencil][npaire].keys():
+            gsum[pencil][npaire][arr] = np.dot(g[:,:,start:end - step:step],
+                                               Fiprod[:,start:end-step:step].transpose())
 
         # # # print(gsum[0,0,:])
         # # print("Fiprod")
@@ -75,7 +84,8 @@ def tdma(a, b, c, rhs, overwrite=True):
         # exit(1)
 
         A0 = x[:,:,start:start+1]
-        x[:,:,start + step:end:step] = fprod[start:end - step:step] * A0 + gsum[:,:,start:end - step:step]
+        x[:,:,start + step:end:step] = fprod[start:end - step:step] * A0 \
+            + gsum[pencil][npaire][arr][:,:,start:end - step:step]
         
     if overwrite:
         bloc = b
@@ -101,7 +111,8 @@ def tdma(a, b, c, rhs, overwrite=True):
     end = nk - 1
     rhsloc[:,:,start] -= (a[start] / bloc[start-1]) * rhsloc[:,:,start-1]
     ihrec1(rhsloc[:,:,start:end], -a[start+1:end] / bloc[start:end-1],
-           rhsloc[:,:,start+1:end])
+           rhsloc[:,:,start+1:end],
+           "fwd")
     rhsloc[:,:,end] -= (a[end] / bloc[end-1]) * rhsloc[:,:,end-1]
 
     # Backward substitution
@@ -113,13 +124,14 @@ def tdma(a, b, c, rhs, overwrite=True):
     crev = np.flip(c)
     brev = np.flip(b)
     ihrec1(rrev[:,:,start:end], -crev[start+1:end] / brev[start+1:end],
-           rrev[:,:,start+1:end] / brev[start+1:end])
+           rrev[:,:,start+1:end] / brev[start+1:end],
+           "rev")
     rhsloc[:,:,0] -= c[0] * rhsloc[:,:,0 + 1]
     rhsloc[:,:,0] /= bloc[0]
 
     return rhsloc
 
-def tdma_periodic(a, b, c, rhs):
+def tdma_periodic(a, b, c, rhs, pencil, npaire):
     """ Periodic form of Tri-Diagonal Matrix Algorithm.
 
     Solves periodic tri-diagonal matrices using TDMA where the matrices are of the form
@@ -158,8 +170,8 @@ def tdma_periodic(a, b, c, rhs):
 
     # Solve A'y=rhs, A'q=u
     # XXX don't overwrite the coefficient arrays!
-    rhs = tdma(a, b, c, rhs, False)
-    u = tdma(a, b, c, np.array([[u]]), False) # TDMA expects a 3D rhs 'vector'
+    rhs = tdma(a, b, c, rhs, pencil, npaire, False)
+    u = tdma(a, b, c, np.array([[u]]), pencil, npaire, False) # TDMA expects a 3D rhs 'vector'
     u = u[0][0]
 
     # Compute solution x = y - v^T y / (1 + v^T q) q
@@ -171,7 +183,7 @@ def tdma_periodic(a, b, c, rhs):
 
     return rhs
 
-def compute_deriv(rhs, bc, npaire):
+def compute_deriv(rhs, bc, pencil, npaire):
     """ Compute the derivative by calling to TDMA.
 
     :param rhs: The rhs vector.
@@ -191,7 +203,7 @@ def compute_deriv(rhs, bc, npaire):
 
     if bc == 0:
         # Periodic
-        return tdma_periodic(a, b, c, rhs)
+        return tdma_periodic(a, b, c, rhs, pencil, npaire)
     else:
         if bc == 1:
             # Free slip
@@ -212,7 +224,7 @@ def compute_deriv(rhs, bc, npaire):
             c[-2] = 0.25
             a[-1] = 1.0
             b[-1] = 2.0
-        return tdma(a, b, c, rhs)
+        return tdma(a, b, c, rhs, pencil, npaire)
 
 def compute_rhs_0(mesh, field, axis):
     """ Compute the rhs for the derivative for periodic BCs.
@@ -455,7 +467,7 @@ def deriv(postproc, phi, axis, time):
 
     # Compute RHS->derivative
     rhs = compute_rhs(postproc, arr, axis, [postproc.fields[phi].direction], bc)
-    rhs = compute_deriv(rhs, bc, not bool(axis in [postproc.fields[phi].direction]))
+    rhs = compute_deriv(rhs, bc, axis, not bool(axis in [postproc.fields[phi].direction]))
 
     if (axis == 1) and postproc.mesh.stretched:
         rhs[:][:] *= postproc.mesh.ppy # XXX derivative is stored in last axis
