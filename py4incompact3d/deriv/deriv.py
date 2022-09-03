@@ -63,11 +63,17 @@ def tdma(a, b, c, rhs, pencil, npaire, overwrite=True):
             Fiprod[pencil][npaire][arr][np.triu_indices(nf)] = 1
             Fiprod[pencil][npaire][arr] = np.cumprod(Fiprod[pencil][npaire][arr], axis=0)
             Fiprod[pencil][npaire][arr][np.triu_indices(nf, 1)] = 0
-            
-        gsum = np.dot(g[:,:,start:end - step:step],
-                      Fiprod[pencil][npaire][arr][:,start:end-step:step].transpose())
+            Fiprod[pencil][npaire][arr] = Fiprod[pencil][npaire][arr]#.transpose()
 
+        # print(g[:,:,start:end - step:step].flags['C_CONTIGUOUS'],
+        #       Fiprod[pencil][npaire][arr][:,start:end-step:step].flags['C_CONTIGUOUS'])
         
+        # gsum = np.dot(g[:,:,start:end - step:step],
+        #               Fiprod[pencil][npaire][arr][:,start:end-step:step])
+        gsum = np.einsum("ij, klj -> kli",
+                         Fiprod[pencil][npaire][arr][:,start:end-step:step],
+                         g[:,:,start:end - step:step],
+                         optimize="greedy")
 
         A0 = x[:,:,start:start+1]
         x[:,:,start + step:end:step] = fprod[start:end - step:step] * A0 \
