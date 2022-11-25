@@ -83,6 +83,7 @@ def main():
 
     for t in range(1, 100+1):
 
+        print(f"Timestep: {t}")
         postprocess.load(time=t)
 
         ux = postprocess.fields["ux"].data[t]
