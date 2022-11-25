@@ -8,7 +8,10 @@
               based on the global indexing in the current pencil.
 """
 
+import numpy as np
+
 import py4incompact3d
+from py4incompact3d import comm, rank
 from py4incompact3d import parallel
 
 N=2
